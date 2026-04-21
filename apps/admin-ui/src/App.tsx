@@ -39,7 +39,7 @@ type ApiRegistration = {
   semester: string;
 };
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:3000";
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:3000";
 
 const emptyLoginForm: LoginForm = {
   username: "",
@@ -97,7 +97,7 @@ function App() {
     setEventsError("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/events`);
+      const response = await fetch(`${apiBaseUrl}/api/events`);
       const payload = (await response.json()) as ApiResponse<ApiEvent[]>;
 
       if (!response.ok || !payload.success || !payload.data) {
@@ -128,7 +128,7 @@ function App() {
     setRegistrationsError("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/registrations/event/${eventId}`);
+      const response = await fetch(`${apiBaseUrl}/api/registrations/event/${eventId}`);
       const payload = (await response.json()) as ApiResponse<ApiRegistration[]>;
 
       if (!response.ok || !payload.success || !payload.data) {
@@ -151,13 +151,7 @@ function App() {
       return;
     }
 
-    const run = async () => {
-      await loadRegistrations(selectedEventId);
-    };
-
-    run().catch(() => {
-      setRegistrationsError("Failed to load registrations");
-    });
+    void loadRegistrations(selectedEventId);
   }, [loadRegistrations, selectedEventId]);
 
   const onLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -169,7 +163,7 @@ function App() {
       const username = loginForm.username.trim();
       const hashedPassword = await sha256(loginForm.password);
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetch(`${apiBaseUrl}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
