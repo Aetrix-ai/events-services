@@ -104,13 +104,15 @@ function App() {
         throw new Error(getErrorMessage(payload));
       }
 
-      setEvents(payload.data);
+      const eventsData = payload.data;
+
+      setEvents(eventsData);
       setSelectedEventId((previous) => {
-        if (previous && payload.data.some((event) => event.id === previous)) {
+        if (previous && eventsData.some((event) => event.id === previous)) {
           return previous;
         }
 
-        return payload.data[0]?.id ?? null;
+        return eventsData[0]?.id ?? null;
       });
     } catch (error) {
       setEvents([]);
