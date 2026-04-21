@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
+import type { Router as ExpressRouter } from 'express';
 import { db } from '../lib/db';
 import { events, teams, registrations, credentials } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
-import crypto from 'crypto';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // Helper function to create or update credentials
 async function upsertCredentials(username: string, hashedPassword: string): Promise<void> {
@@ -50,7 +50,7 @@ router.get('/', async (req: Request, res: Response) => {
 // Get single event by ID with teams and registrations
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const eventId = parseInt(req.params.id);
+    const eventId = parseInt(req.params.id as string);
     
     if (isNaN(eventId)) {
       return res.status(400).json({
@@ -149,7 +149,7 @@ router.post('/', async (req: Request, res: Response) => {
 // Update event
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const eventId = parseInt(req.params.id);
+    const eventId = parseInt(req.params.id as string);
     
     if (isNaN(eventId)) {
       return res.status(400).json({
@@ -199,7 +199,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 // Delete event
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const eventId = parseInt(req.params.id);
+    const eventId = parseInt(req.params.id as string);
     
     if (isNaN(eventId)) {
       return res.status(400).json({
@@ -235,7 +235,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 // Get event statistics
 router.get('/:id/stats', async (req: Request, res: Response) => {
   try {
-    const eventId = parseInt(req.params.id);
+    const eventId = parseInt(req.params.id as string);
     
     if (isNaN(eventId)) {
       return res.status(400).json({

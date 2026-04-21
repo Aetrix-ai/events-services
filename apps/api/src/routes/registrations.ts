@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
+import type { Router as ExpressRouter } from 'express';
 import { db } from '../lib/db';
 import { registrations, teams, events } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 
-const router: Router = Router();
+const router: ExpressRouter = Router();
 
 // Get all registrations for an event
 router.get('/event/:eventId', async (req: Request, res: Response) => {

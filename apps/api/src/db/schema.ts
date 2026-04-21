@@ -70,6 +70,17 @@ export const registrationsRelations = relations(registrations, ({ one }) => ({
   }),
 }));
 
+// Export schema for drizzle
+export const schema = {
+  credentials,
+  events,
+  teams,
+  registrations,
+  eventsRelations,
+  teamsRelations,
+  registrationsRelations,
+};
+
 // Type exports for TypeScript
 export type Credential = typeof credentials.$inferSelect;
 export type NewCredential = typeof credentials.$inferInsert;

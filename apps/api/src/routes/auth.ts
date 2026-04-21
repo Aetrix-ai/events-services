@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
+import type { Router as ExpressRouter } from 'express';
 import { db } from '../lib/db';
 import { credentials, events } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // Login endpoint for admins (expects hashed password from external app)
 router.post('/login', async (req: Request, res: Response) => {
@@ -32,10 +33,10 @@ router.post('/login', async (req: Request, res: Response) => {
     // Verify hashed password
     if (hashedPassword !== user.password) {
       return res.status(401).json({
-        success: false, Router
+        success: false,
         error: 'Invalid credentials',
       });
-    } Router
+    }
 
     res.json({
       success: true,
