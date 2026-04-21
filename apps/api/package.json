@@ -7,17 +7,27 @@
     "build": "tsc -b",
     "start": "node ./dist/server.js",
     "dev": "npm run build && npm run start",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
-    "@repo/typescript-config": "workspace:*"
+    "@repo/types": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/pg": "^8.15.5",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@types/express": "^5.0.6",
-    "express": "^5.2.1"
+    "drizzle-orm": "^0.44.0",
+    "express": "^5.2.1",
+    "pg": "^8.20.0"
   }
 }
