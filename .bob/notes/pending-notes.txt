@@ -1,4 +1,0 @@
-{"id":"e33b36cf-281b-4f38-9054-17826543ad1e","ts":"2026-04-20T17:06:38.377Z","path":"/Users/ashintv/Desktop/tv/finalyear/event-services/packages/types/tsconfig.json","version":"1.0.0","taskID":"b31f3b69-e5da-4fdd-a020-ff801f29f0f8"}
-{"id":"bb06d6f0-37f2-4ab2-95ea-38c1838664eb","ts":"2026-04-20T17:06:49.271Z","path":"/Users/ashintv/Desktop/tv/finalyear/event-services/packages/types/package.json","version":"1.0.0","taskID":"b31f3b69-e5da-4fdd-a020-ff801f29f0f8"}
-{"id":"9595cca5-89e6-45f8-9827-743fee236d94","ts":"2026-04-20T17:06:59.043Z","path":"/Users/ashintv/Desktop/tv/finalyear/event-services/packages/types/src/index.ts","version":"1.0.0","taskID":"b31f3b69-e5da-4fdd-a020-ff801f29f0f8"}
-{"id":"052a81e3-4611-4d82-9fcc-f1b8a6955ec9","ts":"2026-04-20T17:10:28.497Z","path":"/Users/ashintv/Desktop/tv/finalyear/event-services/packages/types/package.json","version":"1.0.0","taskID":"b31f3b69-e5da-4fdd-a020-ff801f29f0f8"}
