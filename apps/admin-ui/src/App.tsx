@@ -40,8 +40,31 @@ type ApiRegistration = {
 };
 
 const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim().replace(/\/$/, "");
-const API_BASE_URL =
-  rawApiBaseUrl && /^https?:\/\//.test(rawApiBaseUrl) ? rawApiBaseUrl : "http://localhost:3000";
+
+function resolveApiBaseUrl(): string {
+  const fallbackBaseUrl = "http://localhost:3000";
+
+  if (!rawApiBaseUrl || !/^https?:\/\//.test(rawApiBaseUrl)) {
+    return fallbackBaseUrl;
+  }
+
+  try {
+    const parsed = new URL(rawApiBaseUrl);
+    if (parsed.protocol === "https:") {
+      return rawApiBaseUrl;
+    }
+
+    if (parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")) {
+      return rawApiBaseUrl;
+    }
+  } catch {
+    return fallbackBaseUrl;
+  }
+
+  return fallbackBaseUrl;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const REGISTRATIONS_TABLE_COLUMN_COUNT = 7;
 
 const emptyLoginForm: LoginForm = {
