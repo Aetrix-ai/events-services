@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -123,7 +123,7 @@ function App() {
     }
   };
 
-  const loadRegistrations = async (eventId: number) => {
+  const loadRegistrations = useCallback(async (eventId: number) => {
     setIsLoadingRegistrations(true);
     setRegistrationsError("");
 
@@ -142,7 +142,7 @@ function App() {
     } finally {
       setIsLoadingRegistrations(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (selectedEventId === null) {
@@ -151,8 +151,14 @@ function App() {
       return;
     }
 
-    void loadRegistrations(selectedEventId);
-  }, [selectedEventId]);
+    const run = async () => {
+      await loadRegistrations(selectedEventId);
+    };
+
+    run().catch(() => {
+      setRegistrationsError("Failed to load registrations");
+    });
+  }, [loadRegistrations, selectedEventId]);
 
   const onLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
