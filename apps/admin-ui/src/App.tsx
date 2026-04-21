@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { LogOut, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +64,7 @@ function App() {
     return teams.filter((team) => team.eventId === selectedEvent.id);
   }, [selectedEvent]);
 
-  const onLogin = (event: React.FormEvent<HTMLFormElement>) => {
+  const onLogin = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const admin = adminUsers.find(
       (candidate) => candidate.username === loginForm.username.trim() && candidate.password === loginForm.password
@@ -89,7 +89,7 @@ function App() {
     setLoginError("");
   };
 
-  const onAddRegistration = (event: React.FormEvent<HTMLFormElement>) => {
+  const onAddRegistration = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!selectedEvent) {
