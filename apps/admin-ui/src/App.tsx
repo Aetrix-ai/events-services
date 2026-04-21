@@ -39,7 +39,9 @@ type ApiRegistration = {
   semester: string;
 };
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:3000";
+const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim().replace(/\/$/, "");
+const API_BASE_URL =
+  rawApiBaseUrl && /^https?:\/\//.test(rawApiBaseUrl) ? rawApiBaseUrl : "http://localhost:3000";
 const REGISTRATIONS_TABLE_COLUMN_COUNT = 7;
 
 const emptyLoginForm: LoginForm = {
