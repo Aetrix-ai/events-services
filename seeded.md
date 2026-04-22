@@ -1,6 +1,15 @@
 # Seeded Login Credentials
 
-Use `hashedPassword` in requests to `POST /api/auth/login` and `POST /api/auth/my-events`.
+The API compares `hashedPassword` directly with stored values.
+Send the exact `hashedPassword` value below in requests to `POST /api/auth/login` and `POST /api/auth/my-events` (do not hash again).
+
+Example request body:
+```json
+{
+  "username": "admin_alpha",
+  "hashedPassword": "5e884898da28047151d0e56f8dc6292773603d0d6aabbddc2b8b4f0f7f9d0f6d"
+}
+```
 
 ## Account 1
 - username: `admin_alpha`
