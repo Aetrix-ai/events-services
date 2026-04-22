@@ -1,162 +1,242 @@
-import { type FormEvent, useMemo, useState } from "react";
-import { LogOut, Pencil, Plus, Trash2 } from "lucide-react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, LogOut } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { adminUsers, events, type RegistrationRecord, registrations as registrationSeed, teams } from "@/data/schema";
 
 type LoginForm = {
   username: string;
   password: string;
 };
 
-type RegistrationDraft = Pick<RegistrationRecord, "attendeeName" | "email" | "status" | "teamId">;
-
-const emptyDraft: RegistrationDraft = {
-  attendeeName: "",
-  email: "",
-  status: "pending",
-  teamId: "",
+type ApiResponse<T> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
 };
 
-function App() {
-  const [loginForm, setLoginForm] = useState<LoginForm>({ username: "", password: "" });
-  const [loginError, setLoginError] = useState<string>("");
-  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
+type ApiEvent = {
+  id: number;
+  name: string;
+  date: string;
+  location: string;
+  description: string | null;
+  owner: string;
+};
 
-  const [registrationRows, setRegistrationRows] = useState<RegistrationRecord[]>(registrationSeed);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [newRegistration, setNewRegistration] = useState<RegistrationDraft>(emptyDraft);
-  const [editingRegistrationId, setEditingRegistrationId] = useState<string | null>(null);
-  const [editingDraft, setEditingDraft] = useState<RegistrationDraft>(emptyDraft);
+type ApiRegistration = {
+  id: number;
+  eventId: number;
+  teamId: number;
+  name: string;
+  email: string;
+  phone: string;
+  college: string;
+  branch: string;
+  semester: string;
+};
 
-  const currentAdmin = useMemo(() => adminUsers.find((admin) => admin.id === currentAdminId) ?? null, [currentAdminId]);
+const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim().replace(/\/$/, "");
 
-  const availableEvents = useMemo(() => {
-    if (!currentAdmin) {
-      return [];
+function resolveApiBaseUrl(): string {
+  const fallbackBaseUrl = "http://localhost:3000";
+
+  if (!rawApiBaseUrl || !/^https?:\/\//.test(rawApiBaseUrl)) {
+    return fallbackBaseUrl;
+  }
+
+  try {
+    const parsed = new URL(rawApiBaseUrl);
+    if (parsed.protocol === "https:") {
+      return rawApiBaseUrl;
     }
 
-    return events.filter((event) => event.ownerId === currentAdmin.id || event.involvedAdminIds.includes(currentAdmin.id));
-  }, [currentAdmin]);
+    if (parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")) {
+      return rawApiBaseUrl;
+    }
+  } catch {
+    return fallbackBaseUrl;
+  }
+
+  return fallbackBaseUrl;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+const REGISTRATIONS_TABLE_COLUMN_COUNT = 7;
+
+const emptyLoginForm: LoginForm = {
+  username: "",
+  password: "",
+};
+
+function getErrorMessage(value: unknown): string {
+  if (typeof value !== "object" || value === null) {
+    return "Request failed";
+  }
+
+  if ("error" in value && typeof value.error === "string") {
+    return value.error;
+  }
+
+  if ("message" in value && typeof value.message === "string") {
+    return value.message;
+  }
+
+  return "Request failed";
+}
+
+async function sha256(value: string): Promise<string> {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function App() {
+  const [loginForm, setLoginForm] = useState<LoginForm>(emptyLoginForm);
+  const [loginError, setLoginError] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  const [loggedInUsername, setLoggedInUsername] = useState<string | null>(null);
+
+  const [events, setEvents] = useState<ApiEvent[]>([]);
+  const [eventsError, setEventsError] = useState("");
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+
+  const [registrations, setRegistrations] = useState<ApiRegistration[]>([]);
+  const [registrationsError, setRegistrationsError] = useState("");
+  const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
 
   const selectedEvent = useMemo(
-    () => availableEvents.find((event) => event.id === selectedEventId) ?? availableEvents[0] ?? null,
-    [availableEvents, selectedEventId]
+    () => events.find((event) => event.id === selectedEventId) ?? null,
+    [events, selectedEventId]
   );
 
-  const filteredRegistrations = useMemo(() => {
-    if (!selectedEvent) {
-      return [];
+  const loadEvents = async () => {
+    setIsLoadingEvents(true);
+    setEventsError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/events`);
+      const payload = (await response.json()) as ApiResponse<ApiEvent[]>;
+
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(getErrorMessage(payload));
+      }
+
+      const eventsData = payload.data;
+
+      setEvents(eventsData);
+      setSelectedEventId((previous) => {
+        if (previous && eventsData.some((event) => event.id === previous)) {
+          return previous;
+        }
+
+        return eventsData[0]?.id ?? null;
+      });
+    } catch (error) {
+      setEvents([]);
+      setSelectedEventId(null);
+      setEventsError(error instanceof Error ? error.message : "Failed to load events");
+    } finally {
+      setIsLoadingEvents(false);
     }
+  };
 
-    return registrationRows.filter((registration) => registration.eventId === selectedEvent.id);
-  }, [registrationRows, selectedEvent]);
+  const loadRegistrations = useCallback(async (eventId: number) => {
+    setIsLoadingRegistrations(true);
+    setRegistrationsError("");
 
-  const filteredTeams = useMemo(() => {
-    if (!selectedEvent) {
-      return [];
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/registrations/event/${eventId}`);
+      const payload = (await response.json()) as ApiResponse<ApiRegistration[]>;
+
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(getErrorMessage(payload));
+      }
+
+      setRegistrations(payload.data);
+    } catch (error) {
+      setRegistrations([]);
+      setRegistrationsError(error instanceof Error ? error.message : "Failed to load registrations");
+    } finally {
+      setIsLoadingRegistrations(false);
     }
+  }, []);
 
-    return teams.filter((team) => team.eventId === selectedEvent.id);
-  }, [selectedEvent]);
-
-  const onLogin = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const admin = adminUsers.find(
-      (candidate) => candidate.username === loginForm.username.trim() && candidate.password === loginForm.password
-    );
-
-    if (!admin) {
-      setLoginError("Invalid username or password from schema credentials.");
+  useEffect(() => {
+    if (selectedEventId === null) {
+      setRegistrations([]);
+      setRegistrationsError("");
       return;
     }
 
-    setCurrentAdminId(admin.id);
-    setSelectedEventId(
-      events.find((record) => record.ownerId === admin.id || record.involvedAdminIds.includes(admin.id))?.id ?? null
-    );
+    void loadRegistrations(selectedEventId);
+  }, [loadRegistrations, selectedEventId]);
+
+  const onLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsAuthenticating(true);
     setLoginError("");
+
+    try {
+      const username = loginForm.username.trim();
+      const hashedPassword = await sha256(loginForm.password);
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, hashedPassword }),
+      });
+
+      const payload = (await response.json()) as ApiResponse<{ username: string }>;
+
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(getErrorMessage(payload));
+      }
+
+      setLoggedInUsername(payload.data.username);
+      await loadEvents();
+      setLoginForm(emptyLoginForm);
+    } catch (error) {
+      setLoggedInUsername(null);
+      setLoginError(error instanceof Error ? error.message : "Login failed");
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   const onLogout = () => {
-    setCurrentAdminId(null);
-    setSelectedEventId(null);
-    setLoginForm({ username: "", password: "" });
+    setLoggedInUsername(null);
+    setLoginForm(emptyLoginForm);
     setLoginError("");
+
+    setEvents([]);
+    setSelectedEventId(null);
+    setEventsError("");
+
+    setRegistrations([]);
+    setRegistrationsError("");
   };
 
-  const onAddRegistration = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!selectedEvent) {
-      return;
-    }
-
-    setRegistrationRows((previous) => [
-      ...previous,
-      {
-        id: `reg-${crypto.randomUUID()}`,
-        eventId: selectedEvent.id,
-        attendeeName: newRegistration.attendeeName.trim(),
-        email: newRegistration.email.trim(),
-        status: newRegistration.status,
-        teamId: newRegistration.teamId.trim(),
-      },
-    ]);
-    setNewRegistration(emptyDraft);
-  };
-
-  const onStartEdit = (registration: RegistrationRecord) => {
-    setEditingRegistrationId(registration.id);
-    setEditingDraft({
-      attendeeName: registration.attendeeName,
-      email: registration.email,
-      status: registration.status,
-      teamId: registration.teamId,
-    });
-  };
-
-  const onSaveEdit = () => {
-    if (!editingRegistrationId) {
-      return;
-    }
-
-    setRegistrationRows((previous) =>
-      previous.map((registration) =>
-        registration.id === editingRegistrationId
-          ? {
-              ...registration,
-              attendeeName: editingDraft.attendeeName.trim(),
-              email: editingDraft.email.trim(),
-              status: editingDraft.status,
-              teamId: editingDraft.teamId.trim(),
-            }
-          : registration
-      )
-    );
-
-    setEditingRegistrationId(null);
-    setEditingDraft(emptyDraft);
-  };
-
-  const onDeleteRegistration = (registrationId: string) => {
-    setRegistrationRows((previous) => previous.filter((registration) => registration.id !== registrationId));
-  };
-
-  if (!currentAdmin) {
+  if (!loggedInUsername) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center px-4 py-10">
         <Card className="w-full">
           <CardHeader>
             <CardTitle>Admin Login</CardTitle>
-            <CardDescription>Use username/password defined in schema data to access registrations.</CardDescription>
+            <CardDescription>Sign in with your admin credentials to access event registrations.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="space-y-4" onSubmit={onLogin}>
+            <form className="space-y-4" onSubmit={(event) => void onLogin(event)}>
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="username">
                   Username
@@ -166,6 +246,7 @@ function App() {
                   autoComplete="username"
                   value={loginForm.username}
                   onChange={(event) => setLoginForm((previous) => ({ ...previous, username: event.target.value }))}
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -178,11 +259,19 @@ function App() {
                   autoComplete="current-password"
                   value={loginForm.password}
                   onChange={(event) => setLoginForm((previous) => ({ ...previous, password: event.target.value }))}
+                  required
                 />
               </div>
               {loginError ? <p className="text-sm text-destructive">{loginError}</p> : null}
-              <Button className="w-full" type="submit">
-                Sign in
+              <Button className="w-full" type="submit" disabled={isAuthenticating}>
+                {isAuthenticating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in
+                  </>
+                ) : (
+                  "Sign in"
+                )}
               </Button>
             </form>
           </CardContent>
@@ -195,11 +284,18 @@ function App() {
     <main className="mx-auto grid min-h-screen w-full max-w-7xl gap-4 px-4 py-6 lg:grid-cols-[280px_minmax(0,1fr)]">
       <Card className="h-fit">
         <CardHeader>
-          <CardTitle className="text-base">Welcome, {currentAdmin.fullName}</CardTitle>
-          <CardDescription>Events you own or are involved in.</CardDescription>
+          <CardTitle className="text-base">Welcome, {loggedInUsername}</CardTitle>
+          <CardDescription>All events from API</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {availableEvents.map((eventRecord) => (
+          {isLoadingEvents ? (
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading events...
+            </div>
+          ) : null}
+          {eventsError ? <p className="text-sm text-destructive">{eventsError}</p> : null}
+          {events.map((eventRecord) => (
             <Button
               key={eventRecord.id}
               variant={selectedEvent?.id === eventRecord.id ? "default" : "outline"}
@@ -223,7 +319,7 @@ function App() {
               <CardHeader>
                 <CardTitle>{selectedEvent.name}</CardTitle>
                 <CardDescription>
-                  {selectedEvent.date} • {selectedEvent.location}
+                  {selectedEvent.date} • {selectedEvent.location} • Owner: {selectedEvent.owner}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -231,177 +327,48 @@ function App() {
             <Card>
               <CardHeader>
                 <CardTitle>Registrations</CardTitle>
-                <CardDescription>Excel-style editable registration grid for this event.</CardDescription>
+                <CardDescription>Registrations for selected event from API.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <form className="grid gap-2 md:grid-cols-5" onSubmit={onAddRegistration}>
-                  <Input
-                    placeholder="Attendee name"
-                    value={newRegistration.attendeeName}
-                    onChange={(event) =>
-                      setNewRegistration((previous) => ({ ...previous, attendeeName: event.target.value }))
-                    }
-                    required
-                  />
-                  <Input
-                    type="email"
-                    placeholder="Email"
-                    value={newRegistration.email}
-                    onChange={(event) => setNewRegistration((previous) => ({ ...previous, email: event.target.value }))}
-                    required
-                  />
-                  <Input
-                    placeholder="Status"
-                    value={newRegistration.status}
-                    onChange={(event) =>
-                      setNewRegistration((previous) => ({
-                        ...previous,
-                        status: event.target.value as RegistrationRecord["status"],
-                      }))
-                    }
-                    required
-                  />
-                  <Input
-                    placeholder="Team ID"
-                    value={newRegistration.teamId}
-                    onChange={(event) => setNewRegistration((previous) => ({ ...previous, teamId: event.target.value }))}
-                    required
-                  />
-                  <Button type="submit" className="w-full">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add
-                  </Button>
-                </form>
-
+              <CardContent>
+                {registrationsError ? <p className="mb-4 text-sm text-destructive">{registrationsError}</p> : null}
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>College</TableHead>
+                      <TableHead>Branch</TableHead>
+                      <TableHead>Semester</TableHead>
                       <TableHead>Team ID</TableHead>
-                      <TableHead className="w-[170px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRegistrations.map((registration) => {
-                      const isEditing = editingRegistrationId === registration.id;
-
-                      return (
-                        <TableRow key={registration.id}>
-                          <TableCell>
-                            {isEditing ? (
-                              <Input
-                                value={editingDraft.attendeeName}
-                                onChange={(event) =>
-                                  setEditingDraft((previous) => ({ ...previous, attendeeName: event.target.value }))
-                                }
-                              />
-                            ) : (
-                              registration.attendeeName
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isEditing ? (
-                              <Input
-                                value={editingDraft.email}
-                                onChange={(event) =>
-                                  setEditingDraft((previous) => ({ ...previous, email: event.target.value }))
-                                }
-                              />
-                            ) : (
-                              registration.email
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isEditing ? (
-                              <Input
-                                value={editingDraft.status}
-                                onChange={(event) =>
-                                  setEditingDraft((previous) => ({
-                                    ...previous,
-                                    status: event.target.value as RegistrationRecord["status"],
-                                  }))
-                                }
-                              />
-                            ) : (
-                              <Badge variant="secondary">{registration.status}</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isEditing ? (
-                              <Input
-                                value={editingDraft.teamId}
-                                onChange={(event) =>
-                                  setEditingDraft((previous) => ({ ...previous, teamId: event.target.value }))
-                                }
-                              />
-                            ) : (
-                              registration.teamId
-                            )}
-                          </TableCell>
-                          <TableCell className="space-x-2">
-                            {isEditing ? (
-                              <>
-                                <Button size="sm" onClick={onSaveEdit}>
-                                  Save
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingRegistrationId(null);
-                                    setEditingDraft(emptyDraft);
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button size="sm" variant="outline" onClick={() => onStartEdit(registration)}>
-                                  <Pencil className="mr-1 h-3 w-3" /> Edit
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => onDeleteRegistration(registration.id)}
-                                >
-                                  <Trash2 className="mr-1 h-3 w-3" /> Delete
-                                </Button>
-                              </>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Teams</CardTitle>
-                <CardDescription>Related teams for the selected event.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Team</TableHead>
-                      <TableHead>Lead Email</TableHead>
-                      <TableHead>Members</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTeams.map((team) => (
-                      <TableRow key={team.id}>
-                        <TableCell>{team.teamName}</TableCell>
-                        <TableCell>{team.leadEmail}</TableCell>
-                        <TableCell>{team.membersCount}</TableCell>
+                    {isLoadingRegistrations ? (
+                      <TableRow>
+                        <TableCell colSpan={REGISTRATIONS_TABLE_COLUMN_COUNT} className="text-center text-muted-foreground">
+                          Loading registrations...
+                        </TableCell>
                       </TableRow>
-                    ))}
+                    ) : registrations.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={REGISTRATIONS_TABLE_COLUMN_COUNT} className="text-center text-muted-foreground">
+                          No registrations found for this event.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      registrations.map((registration) => (
+                        <TableRow key={registration.id}>
+                          <TableCell>{registration.name}</TableCell>
+                          <TableCell>{registration.email}</TableCell>
+                          <TableCell>{registration.phone}</TableCell>
+                          <TableCell>{registration.college}</TableCell>
+                          <TableCell>{registration.branch}</TableCell>
+                          <TableCell>{registration.semester}</TableCell>
+                          <TableCell>{registration.teamId}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -411,7 +378,7 @@ function App() {
           <Card>
             <CardHeader>
               <CardTitle>No events available</CardTitle>
-              <CardDescription>No events are mapped to this admin account.</CardDescription>
+              <CardDescription>There are no events to display for this environment.</CardDescription>
             </CardHeader>
           </Card>
         )}
